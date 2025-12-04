@@ -83,21 +83,37 @@ def page_2():
         if st.button("Run preprocessing"):
             progress.text("Filtering and Pre-processing...")
             progress.progress(0.3)
-            progress.progress(0.6)
-            cv = CountVectorizer(ngram_range=(1, 1),
-                                strip_accents='unicode',
-                                stop_words=stop_words,
-                                token_pattern="[a-zA-Z][a-zA-Z]+")  # at least two letters, and no numerical or special characters
-            dtm = cv.fit_transform(st.session_state.corpus)
-            progress.progress(1.0)
-            wordlist = cv.get_feature_names_out()
-            docfreqs = list(np.squeeze(np.asarray((dtm != 0).sum(0))))  # count number of non-zero document occurrences for each row (i.e. each word)
-            countsDF = pd.DataFrame(zip(wordlist, docfreqs)).reset_index()
-            countsDF.columns = ["id", "word", "DF"]
-            # save df to session state
-            st.session_state.countsDF = countsDF
-            st.markdown("✅ Preprocessing done.")
-            st.markdown("← You can now *Set threshold*.")
+
+            # Check if corpus has valid content
+            corpus = st.session_state.corpus
+            if not corpus or all(not doc.strip() for doc in corpus):
+                st.error("❌ The corpus is empty or contains only empty documents. Please upload valid text files.")
+                progress.empty()
+            else:
+                progress.progress(0.6)
+                cv = CountVectorizer(ngram_range=(1, 1),
+                                    strip_accents='unicode',
+                                    stop_words=stop_words,
+                                    token_pattern="[a-zA-Z][a-zA-Z]+")  # at least two letters, and no numerical or special characters
+                try:
+                    dtm = cv.fit_transform(corpus)
+                    progress.progress(1.0)
+                    wordlist = cv.get_feature_names_out()
+
+                    if len(wordlist) == 0:
+                        st.error("❌ No words remained after preprocessing. Try removing fewer stopwords or check your text files.")
+                        progress.empty()
+                    else:
+                        docfreqs = list(np.squeeze(np.asarray((dtm != 0).sum(0))))  # count number of non-zero document occurrences for each row (i.e. each word)
+                        countsDF = pd.DataFrame(zip(wordlist, docfreqs)).reset_index()
+                        countsDF.columns = ["id", "word", "DF"]
+                        # save df to session state
+                        st.session_state.countsDF = countsDF
+                        st.markdown("✅ Preprocessing done.")
+                        st.markdown("← You can now *Set threshold*.")
+                except ValueError as e:
+                    st.error(f"❌ Preprocessing failed: No valid text found after filtering. This can happen if all words are stopwords or contain only numbers/special characters. Try reducing stopwords or check your input files.")
+                    progress.empty()
 
     else:
         st.write("Corpus is not available. Please upload a zip file.")
